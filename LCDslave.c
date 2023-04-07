@@ -3,8 +3,7 @@
 int Rx_Command = 0;
 
 volatile int j = 0;
-//volatile char packet[] = {0x01, 0x02, 0x03, 0x04};                                                        // Transmit at most 4 bytes???
-volatile char packet[]= {0x0B, 0x0D, 0x0D, 0x10, 0x0D, 0x0C, 0x0D, 0x0D, 0x0D, 0x0D, 0x0D, 0x10, 0x0D};     // 12 byte packet for receiving/testing
+volatile char packet[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x80, 0x00};
 
 volatile int action_select = 0;
 volatile int ms_thresh, ms_count, ms_flag;
@@ -195,7 +194,7 @@ void LCDsetup() {
 int getCharCode(int in) {
     int ret;
     switch(in) {
-        /*case 0x01: // 1
+        case 0x01: // 1
             ret =  0b00110001;
             break;
         case 0x02: // 2
@@ -225,25 +224,26 @@ int getCharCode(int in) {
         case 0x17: // *
             ret =  0b00101010;
             break;
-
         case 0x00: // 0
             ret =  0b00110000;
             break;
-        */
-        case 0x10: // .
+        case 0x12: // .
             ret = 0b00101110;
             break;
         case 0x11: // #
             ret =  -1;
             break;
-        case 0x0B:  // N
-            ret = 0b01001110;
+        case 0x80:
+            ret = 0b01000001;
             break;
-        case 0x0C:  // M
-            ret = 0b01001101;
+        case 0x40:
+            ret = 0b01000010;
             break;
-        case 0x0D:  // x
-            ret = 0b01111000;
+        case 0x20:
+            ret = 0b01000011;
+            break;
+        case 0x10:
+            ret = 0b01000100;
             break;
         default:
             ret = 0;
@@ -264,40 +264,30 @@ void LCDstartDisplay() {
     sendByte(0b01110011, 1);        // Display s
     sendByte(0b00111101, 1);        // Display =
 
-    for(i = 0; i <= 3; i++) {
-        shiftCursorForward();       // Display " " 4 times
-    }
+    shiftCursorForward(4);
 
     sendByte(0b01000001, 1);        // Display A
     sendByte(0b00111010, 1);        // Display :
 
-    for(i = 0; i <= 3; i++) {
-        shiftCursorForward();       // Display " " 4 times
-    }
+    shiftCursorForward(4);
 
 
     sendByte(0b11011111, 1);        // Display °
     sendByte(0b01000011, 1);        // Display C
     setCursorSecondRow();
-    shiftCursorForward();
+    shiftCursorForward(1);
     sendByte(0b00111101, 1);        // Display =
 
-    for(i = 0; i <= 2; i++) {
-        shiftCursorForward();       // Display " " 3 times
-    }
+    shiftCursorForward(3);
 
     sendByte(0b01110011, 1);        // Display s
 
-    for(i = 0; i <= 1; i++) {
-        shiftCursorForward();       // Display " " 2 times
-    }
+    shiftCursorForward(2);
 
     sendByte(0b01010000, 1);        // Display P
     sendByte(0b00111010, 1);        // Display :
 
-    for(i = 0; i <= 3; i++) {
-        shiftCursorForward();       // Display " " 4 times
-    }
+    shiftCursorForward(4);
 
     sendByte(0b11011111, 1);        // Display °
     sendByte(0b01000011, 1);        // Display C
@@ -309,6 +299,9 @@ renderPacket(int start, int stop) {
     int charCount = 0;
     UCB0IE &= ~(UCTXIE0 | UCRXIE0 | UCSTPIE);   // Disable
     for(m=start;m<=stop;m++){
+        if(m == 2 || m == 5) {
+            sendByte(getCharCode(0x12), 1);
+        }
         int code = getCharCode(packet[m]);
         sendByte(code, 1);                      // Display character
         charCount++;
@@ -317,8 +310,11 @@ renderPacket(int start, int stop) {
     UCB0IE |= (UCTXIE0 | UCRXIE0 | UCSTPIE);    // Enable
 }
 
-void shiftCursorForward(){
-    sendByte(0b00010100, 0);
+void shiftCursorForward(int f){
+    int i;
+    for(i = 0; i < f; i++) {
+        sendByte(0b00010100, 0);
+    }
 }
 
 void shiftCursorBackward(){
@@ -362,22 +358,17 @@ int main(void)
 
                     returnHome();
                     sendByte(0b00000110, 0);                // Entry mode set
-                    for(i = 0; i <= 3; i++) {
-                        shiftCursorForward();               // Display " " 4 times
-                    }
-                    sendByte(getCharCode(packet[0]), 1);    // Display n value
-                    for(i = 0; i <= 4; i++) {
-                        shiftCursorForward();               // Display " " 4 times
-                    }
-                    renderPacket(1, 3);                     // Display ambient temperature
+
+                    shiftCursorForward(4);
+                    sendByte(getCharCode(packet[10]), 1);    // Display n value
+                    shiftCursorForward(5);
+                    renderPacket(0, 2);                     // Display ambient temperature
                     setCursorSecondRow();
-                    sendByte(getCharCode(packet[5]), 1);    // Display M
-                    shiftCursorForward();
+                    sendByte(getCharCode(packet[9]), 1);    // Display M
+                    shiftCursorForward(1);
                     renderPacket(6, 8);                     // Display time
-                    for(i = 0; i <= 4; i++) {
-                        shiftCursorForward();               // Display " " 4 times
-                    }
-                    renderPacket(9, 12);                    // Display plant temperature
+                    shiftCursorForward(5);
+                    renderPacket(3, 5);                    // Display plant temperature
 
 
                     action_select = 0;          // End action
