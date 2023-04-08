@@ -86,11 +86,10 @@ void PressD() {
 void initTimerB0compare(){
     // Setup TB0
     TB0CTL |= TBCLR;            // Clear TB0
-    TB0CTL |= TBSSEL__ACLK;    // Select SMCLK
+    TB0CTL |= TBSSEL__ACLK;     // Select ACLK
     TB0CTL |= MC__UP;           // UP mode
 
-    //TB0CCR0 = 347985;           // Set CCR0 value (period = 333ms)
-    TB0CCR0 = 347985;           // Set CCR0 value (period = 333ms)
+    TB0CCR0 = 10923;            // Set CCR0 value (period = 333ms)
     TB0CCTL0 &= ~CCIFG;         // Clear CCR0 flag
     TB0CCTL0 |= CCIE;           // Local IRQ enable for CCR0
 }
