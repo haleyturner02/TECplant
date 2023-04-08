@@ -1,8 +1,8 @@
 #include <msp430.h> 
 
 int Rx_Command;
-int isHeating = 1;
-volatile int timer_action_select;
+int isHeating = 0;                          // Indicator for pattern C heating or cooling
+volatile int timer_action_select;           // Determine selected pattern to display
 volatile int counter = 0;
 
 void initI2C_slave(){
@@ -68,11 +68,28 @@ void PressB() {             // Decreasing pattern for B/cooling mode
     setLEDn(7-counter);
 }
 
-void PressC() {             // Increasing or decreasing pattern for C/ambient mode
+/*void PressC() {             // Increasing or decreasing pattern for C/ambient mode
     if(isHeating == 1) {
         PressA();
     } else {
         PressB();
+    }
+}
+*/
+
+void PressC() {                     // Project stretch- slightly different heating/cooling pattern for C
+    if(isHeating == 1) {            // Step increasing pattern for C heating
+        if(counter % 2 == 0) {
+            setLEDn(counter + 1);
+        } else {
+            setLEDn(counter - 1);
+        }
+    } else {                        // Step decreasing pattern for C cooling
+        if(counter % 2 == 0) {
+            setLEDn(7-counter-1);
+        } else {
+            setLEDn(7-counter+1);
+        }
     }
 }
 
@@ -124,11 +141,11 @@ void init(){
     __enable_interrupt();
 }
 
-int main(void)
-{
+int main(void) {
+    
     init();
 
-    Rx_Command = 0x10;      // Hard coded manual set for Rx_Command
+    Rx_Command = 0x20;      // Hard coded manual set for Rx_Command
     executeCommand();       // Hard coded manual call to execute command
 
     while(1){}
