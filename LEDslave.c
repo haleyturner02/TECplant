@@ -1,8 +1,9 @@
 #include <msp430.h> 
 
 int Rx_Command;
+int isHeating = 1;
 volatile int timer_action_select;
-volatile int counter, heating = 0;
+volatile int counter = 0;
 
 void initI2C_slave(){
     UCB0CTLW0 |= UCSWRST;                   // SW RESET enabled
@@ -59,15 +60,23 @@ void ResetLED() {
     P2OUT &= ~(BIT6 | BIT7);
 }
 
-void PressA() {
+void PressA() {             // Increasing pattern for A/heating mode
     setLEDn(counter);
 }
 
-void PressB() {
+void PressB() {             // Decreasing pattern for B/cooling mode
     setLEDn(7-counter);
 }
 
-void PressD() {
+void PressC() {             // Increasing or decreasing pattern for C/ambient mode
+    if(isHeating == 1) {
+        PressA();
+    } else {
+        PressB();
+    }
+}
+
+void PressD() {             // Alternating pattern for D/off mode
     ResetLED();
     if(counter % 2 == 0) {
         setLEDn(0);
@@ -104,12 +113,12 @@ void init(){
     P2DIR |= (BIT6 | BIT7);
     P2OUT &= ~(BIT6 | BIT7);
 
-    P2DIR |= BIT0; // P2.0 LED output
-    P2OUT &= ~BIT0; // P2.0 off
+    P2DIR |= BIT0;              // P2.0 LED output
+    P2OUT &= ~BIT0;             // P2.0 off
 
     timer_action_select= 0 ;
 
-    //initI2C_slave();
+    //initI2C_slave();          // Temporary for hard code testing
     initTimerB0compare();
 
     __enable_interrupt();
@@ -119,8 +128,8 @@ int main(void)
 {
     init();
 
-    Rx_Command = 0x40;
-    executeCommand();
+    Rx_Command = 0x10;      // Hard coded manual set for Rx_Command
+    executeCommand();       // Hard coded manual call to execute command
 
     while(1){}
 
@@ -156,7 +165,7 @@ void executeCommand(int command){   // Set pattern mode
     }
 }
 
-// Need to receive information about heating or cooling from master for Pattern C
+// Need to receive information about heating or cooling from master for Pattern C (change isHeating = 1 for heat, isHeating = 0 for cool)
 
 #pragma vector=EUSCI_B0_VECTOR
 __interrupt void EUSCI_B0_TX_ISR(void){
@@ -172,24 +181,22 @@ __interrupt void EUSCI_B0_TX_ISR(void){
 #pragma vector=TIMER0_B0_VECTOR
 __interrupt void ISR_TB0_CCR0(void){
 
-    if(timer_action_select == 1) {
+    if(timer_action_select == 1) {              // Update pattern A upon interrupt
         PressA();
-    } else if(timer_action_select == 2) {
+    } else if(timer_action_select == 2) {       // Update pattern B upon interrupt
         PressB();
-    } else if(timer_action_select == 3) {
-        if(heating == 1) {
-            PressA();
-        } else {
-            PressB();
-        }
+    } else if(timer_action_select == 3) {       // Update pattern C upon interrupt
+        PressC();
+    } else if(timer_action_select == 4) {       // Update pattern D upon interrupt
+        PressD();
     }
 
-    if(counter == 7) {
+    if(counter == 7 && timer_action_select != 4) {      // Reset counter and LEDs for patterns A, B, and C after all 7 LEDs have been turned on
         counter = 0;
         ResetLED();
     } else {
-        counter++;
+        counter++;                                      // Increase counter if not all 7 LEDs are on or pattern D is active
     }
 
-    TB0CCTL0 &= ~CCIFG;
+    TB0CCTL0 &= ~CCIFG;                                 // Clear TB0 flag
 }
