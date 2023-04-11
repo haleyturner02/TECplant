@@ -3,7 +3,7 @@
 int Rx_Command = 0;
 
 volatile int j = 0;
-volatile char packet[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x80, 0x00};
+volatile char packet[] = {0x01, 0x02, 0x03, 0x14, 0x05, 0x06, 0x07, 0x08, 0x09, 0x80, 0x00};
 
 volatile int action_select = 0;
 volatile int ms_thresh, ms_count, ms_flag;
@@ -221,32 +221,29 @@ int getCharCode(int in) {
         case 0x09: // 9
             ret =  0b00111001;
             break;
-        case 0x17: // *
-            ret =  0b00101010;
-            break;
         case 0x00: // 0
             ret =  0b00110000;
             break;
-        case 0x12: // .
-            ret = 0b00101110;
+        case 0x17: // *
+            ret =  0b00101010;
             break;
         case 0x11: // #
             ret =  -1;
             break;
-        case 0x80:
+        case 0x14:  // -
+            ret = 0b00101101;
+            break;
+        case 0x80:  // A
             ret = 0b01000001;
             break;
-        case 0x40:
+        case 0x40:  // B
             ret = 0b01000010;
             break;
-        case 0x20:
+        case 0x20:  // C
             ret = 0b01000011;
             break;
-        case 0x10:
+        case 0x10:  // D
             ret = 0b01000100;
-            break;
-        default:
-            ret = 0;
             break;
     }
     return ret;
@@ -388,12 +385,12 @@ __interrupt void EUSCI_B0_TX_ISR(void){
 
     switch(UCB0IV){
         case 0x16:                           // Receiving
-                if(j == 7){
-                   j = 0;
-                   action_select = 1;       // Display temperature or perform action for #/*
-                }
-                //packet[j] = UCB0RXBUF;      // Retrieve byte from buffer
-                j++;
+            if(j == sizeof(packet)){
+                j = 0;
+                action_select = 1;       // Display temperature or perform action for #/*
+            }
+            //packet[j] = UCB0RXBUF;      // Retrieve byte from buffer
+            j++;
 
             break;
         case 0x18:
