@@ -1,7 +1,7 @@
 #include <msp430.h> 
 
 int Rx_Command;
-int isHeating = 1;                          // Indicator for pattern C heating or cooling
+int isHeating = 0;                          // Indicator for pattern C heating or cooling
 volatile int timer_action_select;           // Determine selected pattern to display
 volatile int counter = 0;
 
@@ -147,7 +147,7 @@ int main(void) {
 
     init();
 
-    Rx_Command = 0x10;      // Hard coded manual set for Rx_Command
+    Rx_Command = 0x20;      // Hard coded manual set for Rx_Command
     executeCommand();       // Hard coded manual call to execute command
 
     while(1){}
@@ -210,14 +210,11 @@ __interrupt void ISR_TB0_CCR0(void){
         PressD();
     }
 
-   if(counter == 7 && timer_action_select == 1 && timer_action_select != 4) {      // Reset counter and LEDs for patterns A, B, and C after all 7 LEDs have been turned on
-        counter = 0;
-        ResetLED();
-    } else if(counter == 8 && (timer_action_select == 2 || timer_action_select == 3) && timer_action_select != 4) {
+    if(counter == 8 && timer_action_select != 4) {
         counter = 0;
         ResetLED();
     } else {
-        counter++;                                      // Increase counter if not all 7 LEDs are on or pattern D is active
+        counter++;
     }
 
     TB0CCTL0 &= ~CCIFG;                                 // Clear TB0 flag
