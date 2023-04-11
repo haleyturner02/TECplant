@@ -1,7 +1,7 @@
 #include <msp430.h> 
 
 int Rx_Command;
-int isHeating = 0;                          // Indicator for pattern C heating or cooling
+int isHeating = 1;                          // Indicator for pattern C heating or cooling
 volatile int timer_action_select;           // Determine selected pattern to display
 volatile int counter = 0;
 
@@ -115,12 +115,14 @@ void initTimerB0compare(){
     TB0CTL |= TBSSEL__ACLK;     // Select ACLK
     TB0CTL |= MC__UP;           // UP mode
 
-    TB0CCR0 = 10923;            // Set CCR0 value (period = 333ms)
+    //TB0CCR0 = 10923;            // Set CCR0 value (period = 333ms)
+    TB0CCR0 = 347985;
     TB0CCTL0 &= ~CCIFG;         // Clear CCR0 flag
     TB0CCTL0 |= CCIE;           // Local IRQ enable for CCR0
 }
 
 void init(){
+    PM5CTL0 &= ~LOCKLPM5;       // Turn on I/O
     WDTCTL = WDTPW | WDTHOLD;   // Stop watchdog timer
 
     // Setup LED outputs
@@ -142,10 +144,10 @@ void init(){
 }
 
 int main(void) {
-    
+
     init();
 
-    Rx_Command = 0x20;      // Hard coded manual set for Rx_Command
+    Rx_Command = 0x10;      // Hard coded manual set for Rx_Command
     executeCommand();       // Hard coded manual call to execute command
 
     while(1){}
@@ -208,7 +210,10 @@ __interrupt void ISR_TB0_CCR0(void){
         PressD();
     }
 
-    if(counter == 7 && timer_action_select != 4) {      // Reset counter and LEDs for patterns A, B, and C after all 7 LEDs have been turned on
+   if(counter == 7 && timer_action_select == 1 && timer_action_select != 4) {      // Reset counter and LEDs for patterns A, B, and C after all 7 LEDs have been turned on
+        counter = 0;
+        ResetLED();
+    } else if(counter == 8 && (timer_action_select == 2 || timer_action_select == 3) && timer_action_select != 4) {
         counter = 0;
         ResetLED();
     } else {
