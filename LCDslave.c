@@ -160,11 +160,6 @@ void sendByte(int char_code, int rs){
     sendNibble(char_code, rs);
 }
 
-/*void incr_index_reg_right(){
-    sendByte(0b00010100, 0);
-}
-*/
-
 void setCursorSecondRow(){
     sendByte(0b10101000, 0);
 }
@@ -225,12 +220,6 @@ int getCharCode(int in) {
         case 0x00: // 0
             ret =  0b00110000;
             break;
-        case 0x17: // *
-            ret =  0b00101010;
-            break;
-        case 0x11: // #
-            ret =  -1;
-            break;
         case 0x14:  // -
             ret = 0b00101101;
             break;
@@ -254,8 +243,6 @@ int getCharCode(int in) {
 void LCDstartDisplay() {
     // Res=    A:    °C
     // M=   s  P:    °C
-
-    //int i;
 
     sendByte(0b01010010, 1);        // Display R
     sendByte(0b01100101, 1);        // Display e
@@ -294,7 +281,6 @@ void LCDstartDisplay() {
 
 renderPacket(int start, int stop) {
     int m;
-    //int charCount = 0;
     UCB0IE &= ~(UCTXIE0 | UCRXIE0 | UCSTPIE);   // Disable
     for(m=start;m<=stop;m++){
         if(m == 2 || m == 5) {
@@ -302,7 +288,6 @@ renderPacket(int start, int stop) {
         }
         int code = getCharCode(packet[m]);
         sendByte(code, 1);                      // Display character
-        //charCount++;
         delay1000();
     }
     UCB0IE |= (UCTXIE0 | UCRXIE0 | UCSTPIE);    // Enable
@@ -315,17 +300,11 @@ void shiftCursorForward(int f){
     }
 }
 
-/*void shiftCursorBackward(){
-    sendByte(0b00010000, 0);
-}*/
-
 void returnHome(){
     sendByte(0b00000010, 0);
 }
 
-int main(void)
-{
-    //int charCount = 0;
+int main(void) {
 
     init();
     delay_ms(20);
@@ -337,44 +316,34 @@ int main(void)
 
     action_select = 1;
 
-    //int i ,m, k;
     while(1){
 
         if(action_select == 1){                 // Perform action based on received data from master (display temperature, reset screen, toggle LED)
 
-            int code = getCharCode(packet[0]);
-            if(code == -1){                      // Clear LCD and reset default display if '#' received
-                code = 0;
+            if(packet[0] == 0x11) {                     // Reset screen if '#' received
                 clear_display();
                 LCDstartDisplay();
-                //charCount = 0;
-            } else if(code != 0){
-                if(code == 0b00101010) {        // Turn off LED if '*' received
-                    P1OUT &= ~BIT1;
-                } else {
-                    P1OUT |= BIT1;              // Turn on LED if any other character pressed
+            } else if(packet[0] == 0x17) {              // Turn off LED if '*' received
+                P1OUT &= ~BIT1;
+            } else {                                    // Display packet values
+                P1OUT |= BIT1;                          // Turn on LED if any other character pressed
 
-                    returnHome();
-                    sendByte(0b00000110, 0);                // Entry mode set
+                returnHome();
+                sendByte(0b00000110, 0);                // Entry mode set
 
-                    shiftCursorForward(4);
-                    sendByte(getCharCode(packet[10]), 1);    // Display n value
-                    shiftCursorForward(5);
-                    renderPacket(0, 2);                     // Display ambient temperature
-                    setCursorSecondRow();
-                    sendByte(getCharCode(packet[9]), 1);    // Display M
-                    shiftCursorForward(1);
-                    renderPacket(6, 8);                     // Display time
-                    shiftCursorForward(5);
-                    renderPacket(3, 5);                    // Display plant temperature
+                shiftCursorForward(4);
+                sendByte(getCharCode(packet[10]), 1);   // Display n value
+                shiftCursorForward(5);
+                renderPacket(0, 2);                     // Display ambient temperature
+                setCursorSecondRow();
+                sendByte(getCharCode(packet[9]), 1);    // Display M
+                shiftCursorForward(1);
+                renderPacket(6, 8);                     // Display time
+                shiftCursorForward(5);
+                renderPacket(3, 5);                     // Display plant temperature
 
-
-                    action_select = 0;          // End action
-
-                }
-
+                action_select = 0;                      // End action
             }
-
         }
     }
 
@@ -390,12 +359,10 @@ __interrupt void EUSCI_B0_TX_ISR(void){
                 j = 0;
                 action_select = 1;       // Display temperature or perform action for #/*
             }
-            //packet[j] = UCB0RXBUF;      // Retrieve byte from buffer
+            packet[j] = UCB0RXBUF;      // Retrieve byte from buffer
             j++;
 
             break;
-        //case 0x18:
-           // break;
     }
 
     UCB0IFG &= ~UCTXIFG0;                   // Clear flag to allow I2C interrupt
