@@ -160,9 +160,10 @@ void sendByte(int char_code, int rs){
     sendNibble(char_code, rs);
 }
 
-void incr_index_reg_right(){
+/*void incr_index_reg_right(){
     sendByte(0b00010100, 0);
 }
+*/
 
 void setCursorSecondRow(){
     sendByte(0b10101000, 0);
@@ -254,7 +255,7 @@ void LCDstartDisplay() {
     // Res=    A:    °C
     // M=   s  P:    °C
 
-    int i;
+    //int i;
 
     sendByte(0b01010010, 1);        // Display R
     sendByte(0b01100101, 1);        // Display e
@@ -293,15 +294,15 @@ void LCDstartDisplay() {
 
 renderPacket(int start, int stop) {
     int m;
-    int charCount = 0;
+    //int charCount = 0;
     UCB0IE &= ~(UCTXIE0 | UCRXIE0 | UCSTPIE);   // Disable
     for(m=start;m<=stop;m++){
         if(m == 2 || m == 5) {
-            sendByte(getCharCode(0x12), 1);
+            sendByte(0b00101110, 1);
         }
         int code = getCharCode(packet[m]);
         sendByte(code, 1);                      // Display character
-        charCount++;
+        //charCount++;
         delay1000();
     }
     UCB0IE |= (UCTXIE0 | UCRXIE0 | UCSTPIE);    // Enable
@@ -314,9 +315,9 @@ void shiftCursorForward(int f){
     }
 }
 
-void shiftCursorBackward(){
+/*void shiftCursorBackward(){
     sendByte(0b00010000, 0);
-}
+}*/
 
 void returnHome(){
     sendByte(0b00000010, 0);
@@ -324,7 +325,7 @@ void returnHome(){
 
 int main(void)
 {
-    int charCount = 0;
+    //int charCount = 0;
 
     init();
     delay_ms(20);
@@ -336,7 +337,7 @@ int main(void)
 
     action_select = 1;
 
-    int i ,m, k;
+    //int i ,m, k;
     while(1){
 
         if(action_select == 1){                 // Perform action based on received data from master (display temperature, reset screen, toggle LED)
@@ -346,7 +347,7 @@ int main(void)
                 code = 0;
                 clear_display();
                 LCDstartDisplay();
-                charCount = 0;
+                //charCount = 0;
             } else if(code != 0){
                 if(code == 0b00101010) {        // Turn off LED if '*' received
                     P1OUT &= ~BIT1;
@@ -393,8 +394,8 @@ __interrupt void EUSCI_B0_TX_ISR(void){
             j++;
 
             break;
-        case 0x18:
-            break;
+        //case 0x18:
+           // break;
     }
 
     UCB0IFG &= ~UCTXIFG0;                   // Clear flag to allow I2C interrupt
