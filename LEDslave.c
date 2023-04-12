@@ -1,7 +1,8 @@
 #include <msp430.h> 
 
+int j = 0;
 int Rx_Command;
-int isHeating = 0;                          // Indicator for pattern C heating or cooling
+int isHeating = 1;                          // Indicator for pattern C heating or cooling
 volatile int timer_action_select;           // Determine selected pattern to display
 volatile int counter = 0;
 
@@ -22,7 +23,6 @@ void initI2C_slave(){
 
     UCB0IE |= UCTXIE0 | UCRXIE0 | UCSTPIE;          // Enable I2C B0 Tx/Rx/Stop IRQs
 
-    PM5CTL0 &= ~LOCKLPM5;       // Turn on I/O
     UCB0CTLW0 &= ~UCSWRST;      // SW RESET OFF
 }
 
@@ -121,8 +121,7 @@ void initTimerB0compare(){
     TB0CCTL0 |= CCIE;           // Local IRQ enable for CCR0
 }
 
-void init(){
-    PM5CTL0 &= ~LOCKLPM5;       // Turn on I/O
+void init() {
     WDTCTL = WDTPW | WDTHOLD;   // Stop watchdog timer
 
     // Setup LED outputs
@@ -137,8 +136,10 @@ void init(){
 
     timer_action_select= 0 ;
 
-    //initI2C_slave();          // Temporary for hard code testing
+    initI2C_slave();          // Temporary for hard code testing
     initTimerB0compare();
+
+    PM5CTL0 &= ~LOCKLPM5;       // Turn on I/O
 
     __enable_interrupt();
 }
@@ -147,16 +148,16 @@ int main(void) {
 
     init();
 
-    Rx_Command = 0x20;      // Hard coded manual set for Rx_Command
-    executeCommand();       // Hard coded manual call to execute command
+    //Rx_Command = 0x20;      // Hard coded manual set for Rx_Command
+    //executeCommand();       // Hard coded manual call to execute command
 
     while(1){}
 
     return 0;
 }
 
-void executeCommand(int command){   // Set pattern mode
-    if(Rx_Command == 0x17){         // Reset if '*' pressed
+void executeCommand(){   // Set pattern mode
+    if(Rx_Command == 0x0017){         // Reset if '*' pressed
         P2OUT &= ~BIT0;             // LED alert off
         TB0CCTL0 |= CCIFG;
         timer_action_select = 0;
@@ -164,21 +165,25 @@ void executeCommand(int command){   // Set pattern mode
         ResetLED();                 // Reset LEDs
         TB0CCTL0 &= ~CCIFG;
     } else {
-        if(Rx_Command == 0x80 && timer_action_select != 1){         // Heating mode pattern if 'A' pressed
+        if(Rx_Command == 0x0080 && timer_action_select != 1){         // Heating mode pattern if 'A' pressed
             P2OUT |= BIT0;                                          // LED alert on
             timer_action_select = 1;                                // Select Pattern A
+            counter = 0;
             ResetLED();                                             // Reset LEDs
-        } else if(Rx_Command == 0x40 && timer_action_select != 2){  // Cooling mode pattern if 'B' pressed
+        } else if(Rx_Command == 0x0040 && timer_action_select != 2){  // Cooling mode pattern if 'B' pressed
             P2OUT |= BIT0;                                          // LED alert on
             timer_action_select = 2;                                // Select Pattern B
+            counter = 0;
             ResetLED();                                             // Reset LEDs
-        } else if(Rx_Command == 0x20 && timer_action_select != 3) { // Ambient mode pattern if 'C' pressed
+        } else if(Rx_Command == 0x0020 && timer_action_select != 3) { // Ambient mode pattern if 'C' pressed
             P2OUT |= BIT0;                                          // LED alert on
             timer_action_select = 3;                                // Select Pattern C
+            counter = 0;
             ResetLED();                                             // Reset LEDs
-        } else if(Rx_Command == 0x10 && timer_action_select != 4) { // Off mode pattern if 'D' pressed
+        } else if(Rx_Command == 0x0010 && timer_action_select != 4) { // Off mode pattern if 'D' pressed
             P2OUT |= BIT0;                                          // LED alert on
             timer_action_select = 4;                                // Select Pattern D
+            counter = 0;
             ResetLED();
         }
     }
@@ -190,8 +195,25 @@ void executeCommand(int command){   // Set pattern mode
 __interrupt void EUSCI_B0_TX_ISR(void){
     switch(UCB0IV){
         case 0x16:                      // Receiving
-            Rx_Command = UCB0RXBUF;     // Retrieve byte from buffer
-            executeCommand(Rx_Command);
+
+            if(j == 0) {
+                Rx_Command = UCB0RXBUF;
+                Rx_Command = UCB0RXBUF;
+                j++;
+            } else {
+
+                if(isHeating != UCB0RXBUF) {
+                    ResetLED();
+                    counter = 0;
+                    isHeating = UCB0RXBUF;
+                }
+
+                j = 0;
+            }
+
+            executeCommand();
+
+
             UCB0IFG &= ~UCTXIFG0;       // Clear flag to allow I2C interrupt
             break;
     }
