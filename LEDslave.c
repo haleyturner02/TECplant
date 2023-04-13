@@ -1,10 +1,11 @@
 #include <msp430.h> 
 
-int j = 0;
 int Rx_Command;
 int isHeating = 1;                          // Indicator for pattern C heating or cooling
 volatile int timer_action_select;           // Determine selected pattern to display
 volatile int counter = 0;
+
+char packet[] = {0x00, 0x00};
 
 void initI2C_slave(){
     UCB0CTLW0 |= UCSWRST;                   // SW RESET enabled
@@ -27,18 +28,19 @@ void initI2C_slave(){
 }
 
 void setLEDn(int n) {
-    switch(n){
+
+    switch(n) {
         case 7:
-            P2OUT |= BIT6;
-            break;
-        case 6:
-            P2OUT |= BIT7;
-            break;
-        case 5:
             P1OUT |= BIT7;
             break;
-        case 4:
+        case 6:
             P1OUT |= BIT6;
+            break;
+        case 5:
+            P2OUT |= BIT6;
+            break;
+        case 4:
+            P2OUT |= BIT7;
             break;
         case 3:
             P1OUT |= BIT5;
@@ -60,15 +62,15 @@ void ResetLED() {
     P2OUT &= ~(BIT6 | BIT7);
 }
 
-void PressA() {             // Increasing pattern for A/heating mode
+void PressA() {                     // Increasing pattern for A/heating mode
     setLEDn(counter);
 }
 
-void PressB() {             // Decreasing pattern for B/cooling mode
+void PressB() {                     // Decreasing pattern for B/cooling mode
     setLEDn(7-counter);
 }
 
-/*void PressC() {             // Increasing or decreasing pattern for C/ambient mode
+/*void PressC() {                   // Increasing or decreasing pattern for C/ambient mode
     if(isHeating == 1) {
         PressA();
     } else {
@@ -93,7 +95,7 @@ void PressC() {                     // Project stretch- slightly different heati
     }
 }
 
-void PressD() {             // Alternating pattern for D/off mode
+void PressD() {                     // Alternating pattern for D/off mode
     ResetLED();
     if(counter % 2 == 0) {
         setLEDn(0);
@@ -115,8 +117,7 @@ void initTimerB0compare(){
     TB0CTL |= TBSSEL__ACLK;     // Select ACLK
     TB0CTL |= MC__UP;           // UP mode
 
-    //TB0CCR0 = 10923;            // Set CCR0 value (period = 333ms)
-    TB0CCR0 = 347985;
+    TB0CCR0 = 10666;            // Set CCR0 value (period = 333ms)
     TB0CCTL0 &= ~CCIFG;         // Clear CCR0 flag
     TB0CCTL0 |= CCIE;           // Local IRQ enable for CCR0
 }
@@ -136,10 +137,10 @@ void init() {
 
     timer_action_select= 0 ;
 
-    initI2C_slave();          // Temporary for hard code testing
+    initI2C_slave();            // Temporary for hard code testing
     initTimerB0compare();
 
-    PM5CTL0 &= ~LOCKLPM5;       // Turn on I/O
+    PM5CTL0 &= ~LOCKLPM5;       // Turn on digital I/O
 
     __enable_interrupt();
 }
@@ -148,74 +149,65 @@ int main(void) {
 
     init();
 
-    //Rx_Command = 0x20;      // Hard coded manual set for Rx_Command
-    //executeCommand();       // Hard coded manual call to execute command
-
     while(1){}
 
     return 0;
 }
 
-void executeCommand(){   // Set pattern mode
-    if(Rx_Command == 0x0017){         // Reset if '*' pressed
-        P2OUT &= ~BIT0;             // LED alert off
+void executeCommand(){                  // Set pattern mode
+    if(Rx_Command == 0x0017){           // Reset if '*' pressed
+        P2OUT &= ~BIT0;                 // LED alert off
         TB0CCTL0 |= CCIFG;
         timer_action_select = 0;
-        counter = 0;                // Reset counter
-        ResetLED();                 // Reset LEDs
+        counter = 0;                    // Reset counter
+        ResetLED();                     // Reset LEDs
         TB0CCTL0 &= ~CCIFG;
     } else {
-        if(Rx_Command == 0x0080 && timer_action_select != 1){         // Heating mode pattern if 'A' pressed
-            P2OUT |= BIT0;                                          // LED alert on
-            timer_action_select = 1;                                // Select Pattern A
+        if(Rx_Command == 0x0080 && timer_action_select != 1){           // Heating mode pattern if 'A' pressed
+            P2OUT |= BIT0;                                              // LED alert on
+            timer_action_select = 1;                                    // Select Pattern A
             counter = 0;
-            ResetLED();                                             // Reset LEDs
-        } else if(Rx_Command == 0x0040 && timer_action_select != 2){  // Cooling mode pattern if 'B' pressed
-            P2OUT |= BIT0;                                          // LED alert on
-            timer_action_select = 2;                                // Select Pattern B
+            ResetLED();                                                 // Reset LEDs
+        } else if(Rx_Command == 0x0040 && timer_action_select != 2){    // Cooling mode pattern if 'B' pressed
+            P2OUT |= BIT0;                                              // LED alert on
+            timer_action_select = 2;                                    // Select Pattern B
             counter = 0;
-            ResetLED();                                             // Reset LEDs
-        } else if(Rx_Command == 0x0020 && timer_action_select != 3) { // Ambient mode pattern if 'C' pressed
-            P2OUT |= BIT0;                                          // LED alert on
-            timer_action_select = 3;                                // Select Pattern C
+            ResetLED();                                                 // Reset LEDs
+        } else if(Rx_Command == 0x0020 && timer_action_select != 3) {   // Ambient mode pattern if 'C' pressed
+            P2OUT |= BIT0;                                              // LED alert on
+            timer_action_select = 3;                                    // Select Pattern C
             counter = 0;
-            ResetLED();                                             // Reset LEDs
-        } else if(Rx_Command == 0x0010 && timer_action_select != 4) { // Off mode pattern if 'D' pressed
-            P2OUT |= BIT0;                                          // LED alert on
-            timer_action_select = 4;                                // Select Pattern D
+            ResetLED();                                                 // Reset LEDs
+        } else if(Rx_Command == 0x0010 && timer_action_select != 4) {   // Off mode pattern if 'D' pressed
+            P2OUT |= BIT0;                                              // LED alert on
+            timer_action_select = 4;                                    // Select Pattern D
             counter = 0;
             ResetLED();
         }
     }
 }
 
-// Need to receive information about heating or cooling from master for Pattern C (change isHeating = 1 for heat, isHeating = 0 for cool)
-
 #pragma vector=EUSCI_B0_VECTOR
 __interrupt void EUSCI_B0_TX_ISR(void){
     switch(UCB0IV){
-        case 0x16:                      // Receiving
+        case 0x16:                                                  // Receiving
 
-            if(j == 0) {
-                Rx_Command = UCB0RXBUF;
-                Rx_Command = UCB0RXBUF;
-                j++;
-            } else {
-
-                if(isHeating != UCB0RXBUF) {
+            if(UCB0RXBUF == 0x00 || UCB0RXBUF == 0x01) {            // If receiving 0 or 1, use value to set isHeating
+                if(packet[1] != UCB0RXBUF) {                        // If new value for isHeating is received, reset LED bar to switch between heating/cooling cases
+                    packet[1] =UCB0RXBUF;
                     ResetLED();
                     counter = 0;
-                    isHeating = UCB0RXBUF;
+                    isHeating = packet[1];
                 }
-
-                j = 0;
+            } else if(UCB0RXBUF == 0x80 || UCB0RXBUF == 0x40 || UCB0RXBUF == 0x20 || UCB0RXBUF == 0x10) {       // If receiving A, B, C, or D codes, set Rx_Command and execute the pattern
+                packet[0] = UCB0RXBUF;
+                Rx_Command = packet[0];
+                executeCommand();
             }
 
-            executeCommand();
-
-
-            UCB0IFG &= ~UCTXIFG0;       // Clear flag to allow I2C interrupt
+            UCB0IFG &= ~UCTXIFG0;                                   // Clear flag to allow I2C interrupt
             break;
+
     }
 }
 
