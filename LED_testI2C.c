@@ -13,9 +13,7 @@ volatile unsigned char pressed_key;
 
 
 volatile unsigned char transmit_key;
-
-//char packet[] = {0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A};         // 7 byte packet for transmission
-char packet[] = {0x10, 0x01};
+char charMode;
 
 void initI2C_master(){
      UCB1CTLW0 |= UCSWRST;          // SW RESET ON
@@ -28,7 +26,8 @@ void initI2C_master(){
      UCB1CTLW0 |= UCTR;             // Put into Tx mode
 
      UCB1CTLW1 |= UCASTP_2;         // Enable automatic stop bit
-     UCB1TBCNT = sizeof(packet);    // Transfer byte count
+     UCB1TBCNT = 1;
+     //UCB1TBCNT = sizeof(packet);    // Transfer byte count
 
      // Setup ports
      P6DIR |= (BIT6 | BIT5 | BIT4);     // Set P6.6-4 as OUTPUT
@@ -114,15 +113,7 @@ int main(void) {
 
 void keyPressedAction(char pressed_key) {
     if(lock_state == 1){
-        if(pressed_key == 0x80 || pressed_key == 0x40 || pressed_key == 0x20 || pressed_key == 0x10) {        // If #/*, transmit to LCD slave
-            packet[0] = pressed_key;                            // Place #/* first in packet
-            //packet[1] = 0x00;
-            UCB1IE |= UCTXIE0;                                  // Enable I2C B0 TX interrupt
-        } else if (pressed_key == 0x17) {
-            packet[1] = 0x01;
-        } else if(pressed_key = 0x11) {
-            packet[1] = 0x00;
-        }
+        charMode = pressed_key;
     }
 
     columnInput();                              // Reset keypad columns to be inputs
@@ -158,11 +149,6 @@ __interrupt void ISR_TB0_CCR0(void){
 
 #pragma vector=EUSCI_B1_VECTOR
 __interrupt void EUSCI_B1_TX_ISR(void){                     // Fill TX buffer with packet values
-    if (j == (sizeof(packet)-1)){
-        UCB1TXBUF = packet[j];
-        j = 0;
-    } else {
-        UCB1TXBUF = packet[j];
-        j++;
-    }
+
+    UCB1TXBUF = charMode;
 }
