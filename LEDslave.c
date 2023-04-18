@@ -1,11 +1,9 @@
 #include <msp430.h> 
 
 int Rx_Command;
-int isHeating = 1;                          // Indicator for pattern C heating or cooling
 volatile int timer_action_select;           // Determine selected pattern to display
 volatile int counter = 0;
 
-char packet[] = {0x00, 0x00};
 
 void initI2C_slave(){
     UCB0CTLW0 |= UCSWRST;                   // SW RESET enabled
@@ -70,28 +68,19 @@ void PressB() {                     // Decreasing pattern for B/cooling mode
     setLEDn(7-counter);
 }
 
-/*void PressC() {                   // Increasing or decreasing pattern for C/ambient mode
-    if(isHeating == 1) {
-        PressA();
+void PressC_heating() {             // Step increasing pattern for C/heating mode
+    if(counter % 2 == 0) {
+        setLEDn(counter + 1);
     } else {
-        PressB();
+        setLEDn(counter - 1);
     }
 }
-*/
 
-void PressC() {                     // Project stretch- slightly different heating/cooling pattern for C
-    if(isHeating == 1) {            // Step increasing pattern for C heating
-        if(counter % 2 == 0) {
-            setLEDn(counter + 1);
-        } else {
-            setLEDn(counter - 1);
-        }
-    } else {                        // Step decreasing pattern for C cooling
-        if(counter % 2 == 0) {
-            setLEDn(7-counter-1);
-        } else {
-            setLEDn(7-counter+1);
-        }
+void PressC_cooling() {             // Step decreasing pattern for C/cooling mode
+    if(counter % 2 == 0) {
+        setLEDn(7-counter-1);
+    } else {
+        setLEDn(7-counter+1);
     }
 }
 
@@ -154,36 +143,33 @@ int main(void) {
     return 0;
 }
 
-void executeCommand(){                  // Set pattern mode
-    if(Rx_Command == 0x0017){           // Reset if '*' pressed
-        P2OUT &= ~BIT0;                 // LED alert off
-        TB0CCTL0 |= CCIFG;
-        timer_action_select = 0;
-        counter = 0;                    // Reset counter
-        ResetLED();                     // Reset LEDs
-        TB0CCTL0 &= ~CCIFG;
-    } else {
-        if(Rx_Command == 0x0080 && timer_action_select != 1){           // Heating mode pattern if 'A' pressed
-            P2OUT |= BIT0;                                              // LED alert on
-            timer_action_select = 1;                                    // Select Pattern A
-            counter = 0;
-            ResetLED();                                                 // Reset LEDs
-        } else if(Rx_Command == 0x0040 && timer_action_select != 2){    // Cooling mode pattern if 'B' pressed
-            P2OUT |= BIT0;                                              // LED alert on
-            timer_action_select = 2;                                    // Select Pattern B
-            counter = 0;
-            ResetLED();                                                 // Reset LEDs
-        } else if(Rx_Command == 0x0020 && timer_action_select != 3) {   // Ambient mode pattern if 'C' pressed
-            P2OUT |= BIT0;                                              // LED alert on
-            timer_action_select = 3;                                    // Select Pattern C
-            counter = 0;
-            ResetLED();                                                 // Reset LEDs
-        } else if(Rx_Command == 0x0010 && timer_action_select != 4) {   // Off mode pattern if 'D' pressed
-            P2OUT |= BIT0;                                              // LED alert on
-            timer_action_select = 4;                                    // Select Pattern D
-            counter = 0;
-            ResetLED();
-        }
+
+void executeCommand() {
+    if(Rx_Command == 0x80 && timer_action_select != 1) {            // Pattern A
+        P2OUT ^= BIT0;
+        timer_action_select = 1;
+        counter = 0;
+        ResetLED();
+    } else if(Rx_Command == 0x40 && timer_action_select != 2) {     // Pattern B
+        P2OUT ^= BIT0;
+        timer_action_select = 2;
+        counter = 0;
+        ResetLED();
+    } else if(Rx_Command == 0x17 && timer_action_select != 3) {     // Pattern C heating
+        P2OUT ^= BIT0;
+        timer_action_select = 3;
+        counter = 0;
+        ResetLED();
+    } else if(Rx_Command == 0x11 && timer_action_select != 4) {     // Pattern C cooling
+        P2OUT ^= BIT0;
+        timer_action_select = 4;
+        counter = 0;
+        ResetLED();
+    } else if(Rx_Command == 0x10 && timer_action_select != 5) {     // Pattern D
+        P2OUT ^= BIT0;
+        timer_action_select = 5;
+        counter = 0;
+        ResetLED();
     }
 }
 
@@ -192,18 +178,9 @@ __interrupt void EUSCI_B0_TX_ISR(void){
     switch(UCB0IV){
         case 0x16:                                                  // Receiving
 
-            if(UCB0RXBUF == 0x00 || UCB0RXBUF == 0x01) {            // If receiving 0 or 1, use value to set isHeating
-                if(packet[1] != UCB0RXBUF) {                        // If new value for isHeating is received, reset LED bar to switch between heating/cooling cases
-                    packet[1] =UCB0RXBUF;
-                    ResetLED();
-                    counter = 0;
-                    isHeating = packet[1];
-                }
-            } else if(UCB0RXBUF == 0x80 || UCB0RXBUF == 0x40 || UCB0RXBUF == 0x20 || UCB0RXBUF == 0x10) {       // If receiving A, B, C, or D codes, set Rx_Command and execute the pattern
-                packet[0] = UCB0RXBUF;
-                Rx_Command = packet[0];
-                executeCommand();
-            }
+            Rx_Command = UCB0RXBUF;                                 // Retrieve byte from buffer
+
+            executeCommand();                                       // Determine pattern using byte received
 
             UCB0IFG &= ~UCTXIFG0;                                   // Clear flag to allow I2C interrupt
             break;
@@ -218,16 +195,18 @@ __interrupt void ISR_TB0_CCR0(void){
         PressA();
     } else if(timer_action_select == 2) {       // Update pattern B upon interrupt
         PressB();
-    } else if(timer_action_select == 3) {       // Update pattern C upon interrupt
-        PressC();
-    } else if(timer_action_select == 4) {       // Update pattern D upon interrupt
-        PressD();
+    } else if(timer_action_select == 3) {       // Update pattern C heating upon interrupt
+        PressC_heating();
+    } else if(timer_action_select == 4) {       // Update pattern C cooling upon interrupt
+        PressC_cooling();
+    } else if(timer_action_select == 5) {
+        PressD();                               // Update pattern D upon interrupt
     }
 
-    if(counter == 8 && timer_action_select != 4) {
+    if(counter == 8 && timer_action_select != 5) {      // Reset counter when it reaches 8 for all modes except pattern D
         counter = 0;
         ResetLED();
-    } else {
+    } else {                                            // Increment counter if it is less than 8
         counter++;
     }
 
